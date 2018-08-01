@@ -5,8 +5,8 @@ import './BalanceHolder.sol';
 contract IRealitio {
     function notifyOfArbitrationRequest(bytes32 question_id, address requester, uint256 max_previous) external;
     function submitAnswerByArbitrator(bytes32 question_id, bytes32 answer, address answerer) external; 
-    function questions(bytes32 question_id) view returns (bytes32, address, uint32, uint32, uint32, bool, uint256, bytes32, bytes32, uint256);
-    function commitments(bytes32 commitment_id) view returns (uint32, bool, bytes32);
+    function questions(bytes32 question_id) view public returns (bytes32, address, uint32, uint32, uint32, bool, uint256, bytes32, bytes32, uint256) ;
+    function commitments(bytes32 commitment_id) view public returns (uint32, bool, bytes32);
 }
 
 contract ICash{}
@@ -33,26 +33,6 @@ contract Arbitrator is BalanceHolder {
     mapping(address=>bool) winning_universes;
     IUniverse latest_universe;
 
-	struct Question {
-        bytes32 content_hash;
-        address arbitrator;
-        uint32 opening_ts;
-        uint32 timeout;
-        uint32 finalize_ts;
-        bool is_pending_arbitration;
-        uint256 bounty;
-        bytes32 best_answer;
-        bytes32 history_hash;
-        uint256 bond;
-    }
-
-    // Stored in a mapping indexed by commitment_id, a hash of commitment hash, question, bond.
-    struct Commitment {
-        uint32 reveal_ts;
-        bool is_revealed;
-        bytes32 revealed_answer;
-    }
-
     event LogRequestArbitration(
         bytes32 indexed question_id,
         uint256 fee_paid,
@@ -73,7 +53,8 @@ contract Arbitrator is BalanceHolder {
     mapping(bytes32 => RealitioQuestion) realitio_questions;
     mapping(address => AugurMarket) augur_markets;
 
-    function initialize(IRealitio _realitio, uint256 _template_id, uint256 _dispute_fee, IUniverse _genesis_universe, ICash _market_token) {
+    function initialize(IRealitio _realitio, uint256 _template_id, uint256 _dispute_fee, IUniverse _genesis_universe, ICash _market_token) 
+    external {
 
         require(dispute_fee == 0); // uninitialized
         require(_dispute_fee > 0);
@@ -88,14 +69,17 @@ contract Arbitrator is BalanceHolder {
 
     /// @notice Register a winning child universe after a fork
     /// @dev Anyone can create Augur universes but the "correct" ones should be in a single line from the official genesis universe
-    function addForkedUniverse(address parent) {
+    function addForkedUniverse(address parent) 
+    external {
         require(winning_universes[parent]);
         IUniverse child_universe = IUniverse(parent).getWinningChildUniverse();
         winning_universes[address(child_universe)] = true;
         latest_universe = child_universe;
     }
 
-    function createMarket( bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, uint256 nonce, address asker, address designated_reporter ) {
+    function createMarket( bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, uint256 nonce, address asker, address designated_reporter ) 
+    external
+    {
         bytes32 content_hash = keccak256(abi.encodePacked(template_id, opening_ts, question));
         require(question_id == keccak256(abi.encodePacked(content_hash, this, timeout, asker, nonce)));
 
@@ -106,13 +90,8 @@ contract Arbitrator is BalanceHolder {
         augur_markets[market].owner = msg.sender;
     }
 
-    /// @notice Given the last history entry, get whether they had a valid answer, the answer, and the answerer
-    /// @dev These just need to be fetched from Realitio, but they can't be fetched directly because we don't store them to save gas
-	/// @dev To get the final answer, we need to reconstruct the final answer using the history hash
-	/// @dev TODO: This should probably be in a library offered by Realitio
-    function _verifiedAnswerData(bytes32 question_id, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment) 
-    internal view returns (bool, bytes32)
-    {
+    function _historyVerificationData(bytes32 question_id)
+    internal view returns (bool, bytes32) {
         (
             bytes32 content_hash,
             address arbitrator,
@@ -125,6 +104,20 @@ contract Arbitrator is BalanceHolder {
             bytes32 history_hash,
             uint256 bond
         ) = realitio.questions(question_id);
+        return (is_pending_arbitration, history_hash);
+
+    }
+
+
+    /// @notice Given the last history entry, get whether they had a valid answer, the answer, and the answerer
+    /// @dev These just need to be fetched from Realitio, but they can't be fetched directly because we don't store them to save gas
+	/// @dev To get the final answer, we need to reconstruct the final answer using the history hash
+	/// @dev TODO: This should probably be in a library offered by Realitio
+    function _verifiedAnswerData(bytes32 question_id, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment) 
+    internal view returns (bool, bytes32)
+    {
+    
+        (bool is_pending_arbitration, bytes32 history_hash) = _historyVerificationData(question_id);
 
         require(history_hash == keccak256(abi.encodePacked(last_history_hash, last_answer_or_commitment_id, last_bond, last_answerer, is_commitment)));
         require(is_pending_arbitration);
@@ -186,9 +179,9 @@ contract Arbitrator is BalanceHolder {
 
         address winner;
         if (is_answered && last_answer == answer) {
-            winner = realitio_questions[question_id].disputer;
-        } else {
             winner = last_answerer;
+        } else {
+            winner = realitio_questions[question_id].disputer;
         }
 
         realitio.submitAnswerByArbitrator(question_id, answer, winner);
