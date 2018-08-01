@@ -112,16 +112,16 @@ contract Arbitrator is BalanceHolder {
     function _historyVerificationData(bytes32 question_id)
     internal view returns (bool, bytes32) {
         (
-            bytes32 content_hash,
-            address arbitrator,
-            uint32 opening_ts,
-            uint32 timeout,
-            uint32 finalize_ts,
+            ,
+            ,
+            ,
+            ,
+            ,
             bool is_pending_arbitration,
-            uint256 bounty,
-            bytes32 best_answer,
+            ,
+            ,
             bytes32 history_hash,
-            uint256 bond
+            
         ) = realitio.questions(question_id);
         return (is_pending_arbitration, history_hash);
 
@@ -150,9 +150,12 @@ contract Arbitrator is BalanceHolder {
 
         if (is_commitment) {
             (uint32 reveal_ts, bool is_revealed, bytes32 revealed_answer) = realitio.commitments(last_answer_or_commitment_id);
+
             if (is_revealed) {
                 last_answer = revealed_answer;
             } else {
+                // Shouldn't normally happen, but if the last answerer might still reveal, bail out and wait for them.
+                require(reveal_ts < now);
                 is_answered = false;
             }
         } else {
