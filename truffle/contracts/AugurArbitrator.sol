@@ -86,12 +86,13 @@ contract Arbitrator is BalanceHolder {
     /// @param question The question content // TODO Check if realitio format and the Augur format, see if we need to convert anything
     /// @param timeout The timeout between rounds, set when the question was created
     /// @param opening_ts The opening timestamp for the question, set when the question was created
-    /// @param nonce The nonce for the question, set when the question was created
     /// @param asker The address that created the question, ie the msg.sender of the original realitio.askQuestion call
+    /// @param nonce The nonce for the question, set when the question was created
     /// @param designated_reporter The Augur designated reporter. We let the market creator choose this, if it's bad the Augur dispute resolution should sort it out
-    function createMarket(bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, uint256 nonce, address asker, address designated_reporter) 
-    external
-    {
+    function createMarket(
+        bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, address asker, uint256 nonce,
+        address designated_reporter
+    ) external {
         // Make sure the parameters provided match the question in question
         bytes32 content_hash = keccak256(abi.encodePacked(template_id, opening_ts, question));
         require(question_id == keccak256(abi.encodePacked(content_hash, this, timeout, asker, nonce)));
@@ -137,8 +138,10 @@ contract Arbitrator is BalanceHolder {
     /// @param last_bond The bond paid in the last answer given
     /// @param last_answerer The account that submitted the last answer (or its commitment)
     /// @param is_commitment Whether the last answer was submitted with commit->reveal
-    function _verifiedAnswerData(bytes32 question_id, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment) 
-    internal view returns (bool, bytes32) {
+    function _verifiedAnswerData(
+        bytes32 question_id, 
+        bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
+    ) internal view returns (bool, bytes32) {
     
         (bool is_pending_arbitration, bytes32 history_hash) = _historyVerificationData(question_id);
 
@@ -177,8 +180,10 @@ contract Arbitrator is BalanceHolder {
     /// @param last_bond The bond paid in the last answer given
     /// @param last_answerer The account that submitted the last answer (or its commitment)
     /// @param is_commitment Whether the last answer was submitted with commit->reveal
-    function reportAnswer(IMarket market, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment) 
-    public {
+    function reportAnswer(
+        IMarket market, 
+        bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment
+    ) public {
 
         bytes32 question_id = augur_markets[market].question_id;
         require(question_id != bytes32(0));
