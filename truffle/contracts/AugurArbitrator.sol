@@ -65,6 +65,7 @@ contract Arbitrator is BalanceHolder {
         winning_universes[_genesis_universe] = true;
         latest_universe = _genesis_universe;
         market_token = _market_token;
+
     }
 
     /// @notice Register a winning child universe after a fork
@@ -77,11 +78,25 @@ contract Arbitrator is BalanceHolder {
         latest_universe = child_universe;
     }
 
-    function createMarket( bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, uint256 nonce, address asker, address designated_reporter ) 
+    /// @notice Create a market in Augur and store the creator as its owner
+    /// @dev Anyone can all this, and calling this will give them the rights to claim the bounty
+    /// @dev If people want to create multiple markets for the same question, they can, and the first to resolve can get paid
+    /// @dev Their account will need to have been funded with some REP for the no-show bond.
+    /// @param question_id The question in question
+    /// @param question The question content // TODO Check if realitio format and the Augur format, see if we need to convert anything
+    /// @param timeout The timeout between rounds, set when the question was created
+    /// @param opening_ts The opening timestamp for the question, set when the question was created
+    /// @param nonce The nonce for the question, set when the question was created
+    /// @param asker The address that created the question, ie the msg.sender of the original realitio.askQuestion call
+    /// @param designated_reporter The Augur designated reporter. We let the market creator choose this, if it's bad the Augur dispute resolution should sort it out
+    function createMarket(bytes32 question_id, string question, uint32 timeout, uint32 opening_ts, uint256 nonce, address asker, address designated_reporter) 
     external
     {
+        // Make sure the parameters provided match the question in question
         bytes32 content_hash = keccak256(abi.encodePacked(template_id, opening_ts, question));
         require(question_id == keccak256(abi.encodePacked(content_hash, this, timeout, asker, nonce)));
+
+        require(realitio_questions[question_id].bounty > 0);
 
         // Create a market that's already finished
         IMarket market = latest_universe.createYesNoMarket( now, 0, market_token, designated_reporter, 0x0, question, "");
@@ -90,6 +105,10 @@ contract Arbitrator is BalanceHolder {
         augur_markets[market].owner = msg.sender;
     }
 
+    /// @notice Return data needed to verify the last history item
+    /// @dev Filters the question struct from Realitio to stuff we need
+    /// @dev Broken out into its own function to avoid stack depth limitations
+    /// @param question_id The realitio question
     function _historyVerificationData(bytes32 question_id)
     internal view returns (bool, bytes32) {
         (
@@ -108,14 +127,18 @@ contract Arbitrator is BalanceHolder {
 
     }
 
-
-    /// @notice Given the last history entry, get whether they had a valid answer, the answer, and the answerer
+    /// @notice Given the last history entry, get whether they had a valid answer if so what it was
     /// @dev These just need to be fetched from Realitio, but they can't be fetched directly because we don't store them to save gas
-	/// @dev To get the final answer, we need to reconstruct the final answer using the history hash
-	/// @dev TODO: This should probably be in a library offered by Realitio
+    /// @dev To get the final answer, we need to reconstruct the final answer using the history hash
+    /// @dev TODO: This should probably be in a library offered by Realitio
+    /// @param question_id The ID of the realitio question
+    /// @param last_history_hash The history hash when you gave your answer 
+    /// @param last_answer_or_commitment_id The last answer given, or its commitment ID if it was a commitment 
+    /// @param last_bond The bond paid in the last answer given
+    /// @param last_answerer The account that submitted the last answer (or its commitment)
+    /// @param is_commitment Whether the last answer was submitted with commit->reveal
     function _verifiedAnswerData(bytes32 question_id, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment) 
-    internal view returns (bool, bytes32)
-    {
+    internal view returns (bool, bytes32) {
     
         (bool is_pending_arbitration, bytes32 history_hash) = _historyVerificationData(question_id);
 
@@ -125,14 +148,14 @@ contract Arbitrator is BalanceHolder {
         bytes32 last_answer;
         bool is_answered = true;
 
-		if (is_commitment) {
+        if (is_commitment) {
             (uint32 reveal_ts, bool is_revealed, bytes32 revealed_answer) = realitio.commitments(last_answer_or_commitment_id);
             if (is_revealed) {
                 last_answer = revealed_answer;
             } else {
                 is_answered = false;
             }
-		} else {
+        } else {
             last_answer = last_answer_or_commitment_id;
         }
 
@@ -140,9 +163,19 @@ contract Arbitrator is BalanceHolder {
 
     }
 
+    /// @notice Report the answer from a finalized Augur market to a Realitio contract with a question awaiting arbitration
+    /// @dev Pays the arbitration bounty to whoever created the Augur market. Probably the same person will call this function, but they don't have to.
+    /// @dev We need to know who gave the final answer and what it was, as they need to be supplied as the arbitration winner if the last answer is right
+    /// @dev These just need to be fetched from Realitio, but they can't be fetched directly because to save gas, Realitio doesn't store them 
+    /// @dev To get the final answer, we need to reconstruct the final answer using the history hash
+    /// @param market The address of the Augur market which you intend to use to settle this question
+    /// @param last_history_hash The history hash when you gave your answer 
+    /// @param last_answer_or_commitment_id The last answer given, or its commitment ID if it was a commitment 
+    /// @param last_bond The bond paid in the last answer given
+    /// @param last_answerer The account that submitted the last answer (or its commitment)
+    /// @param is_commitment Whether the last answer was submitted with commit->reveal
     function reportAnswer(IMarket market, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, uint256 last_bond, address last_answerer, bool is_commitment) 
-    public
-    {
+    public {
 
         bytes32 question_id = augur_markets[market].question_id;
         require(question_id != bytes32(0));
@@ -157,7 +190,6 @@ contract Arbitrator is BalanceHolder {
         require(market.isFinalized());
 
         bytes32 answer;
-
         if (market.isInvalid()) {
             answer = 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
         } else {
@@ -181,12 +213,14 @@ contract Arbitrator is BalanceHolder {
         if (is_answered && last_answer == answer) {
             winner = last_answerer;
         } else {
+            // If the final answer is wrong, we assign the person who paid for arbitration.
+            // See https://realitio.github.io/docs/html/arbitrators.html for why.
             winner = realitio_questions[question_id].disputer;
         }
 
         realitio.submitAnswerByArbitrator(question_id, answer, winner);
-        address owner = augur_markets[market].owner;
 
+        address owner = augur_markets[market].owner;
         balanceOf[owner] += realitio_questions[question_id].bounty;
 
         delete augur_markets[market];
@@ -225,5 +259,3 @@ contract Arbitrator is BalanceHolder {
     }
 
 }
-
-
