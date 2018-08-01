@@ -155,7 +155,7 @@ contract Arbitrator is BalanceHolder {
                 last_answer = revealed_answer;
             } else {
                 // Shouldn't normally happen, but if the last answerer might still reveal, bail out and wait for them.
-                require(reveal_ts < now);
+                require(reveal_ts < uint32(now));
                 is_answered = false;
             }
         } else {
