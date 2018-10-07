@@ -664,4 +664,10 @@ contract RealityCheck is BalanceHolder {
         }
         withdraw();
     }
+
+    function getQuestionFinalizationTs(bytes32 question_id) public constant returns(uint32) 
+            stateAny() // The finalization checks are done in the claimWinnings function
+    {
+        return questions[question_id].finalize_ts;
+    }
 }
