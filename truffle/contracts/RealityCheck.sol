@@ -1,6 +1,6 @@
-pragma solidity 0.4.18;
+pragma solidity ^0.4.18;
 
-import './SafeMath.sol';
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import './SafeMath32.sol';
 import './BalanceHolder.sol';
 
