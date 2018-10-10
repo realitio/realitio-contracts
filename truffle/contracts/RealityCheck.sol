@@ -1,6 +1,6 @@
-pragma solidity 0.4.18;
+pragma solidity ^0.4.18;
 
-import './SafeMath.sol';
+import "openzeppelin-solidity/contracts/math/SafeMath.sol";
 import './SafeMath32.sol';
 import './BalanceHolder.sol';
 
@@ -663,5 +663,10 @@ contract RealityCheck is BalanceHolder {
             claimWinnings(qid, hh, ad, bo, an);
         }
         withdraw();
+    }
+
+    function getQuestionFinalizationTs(bytes32 question_id) public constant returns(uint32) 
+    {
+        return questions[question_id].finalize_ts;
     }
 }
