@@ -323,6 +323,24 @@ contract Realitio is BalanceHolder {
         _updateCurrentAnswer(question_id, answer, questions[question_id].timeout);
     }
 
+    /// @notice Submit an answer for a question on behalf of another account.
+    /// @dev Adds the answer to the history and updates the current "best" answer.
+    /// @dev Variant of submitAnswer(), the only difference is that you supply the account instead of using msg.sender.
+    /// May be subject to front-running attacks; Substitute submitAnswerCommitment()->submitAnswerReveal() to prevent them.
+    /// @param question_id The ID of the question
+    /// @param answer The answer, encoded into bytes32
+    /// @param max_previous If specified, reverts if a bond higher than this was submitted after you sent your transaction.
+    /// @param answerer The user on whose behalf the answer is submitted
+    function submitAnswerFor(bytes32 question_id, bytes32 answer, uint256 max_previous, address answerer) 
+        stateOpen(question_id)
+        bondMustDouble(question_id)
+        previousBondMustNotBeatMaxPrevious(question_id, max_previous)
+    external payable {
+        require(answerer != NULL_ADDRESS, "Answerer must be supplied");
+        _addAnswerToHistory(question_id, answer, answerer, msg.value, false);
+        _updateCurrentAnswer(question_id, answer, questions[question_id].timeout);
+    }
+
     /// @notice Submit the hash of an answer, laying your claim to that answer if you reveal it in a subsequent transaction.
     /// @dev Creates a hash, commitment_id, uniquely identifying this answer, to this question, with this bond.
     /// The commitment_id is stored in the answer history where the answer would normally go.
