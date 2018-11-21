@@ -106,12 +106,12 @@ class TestSplitter(TestCase):
         self.assertEqual(self.wallet0.balanceOf(t.a1), 100000)
         self.assertEqual(self.c.head_state.get_balance(self.wallet0.address), 100000)
 
-        self.wallet0.withdraw(sender=t.k1)
+        self.wallet0.withdrawFor(t.a1)
         self.assertEqual(self.wallet0.balanceOf(t.a1), 0)
         self.assertEqual(self.c.head_state.get_balance(self.wallet0.address), 0)
 
         with self.assertRaises(TransactionFailed):
-            self.wallet0.withdraw(sender=t.k1)
+            self.wallet0.withdrawFor(t.a1)
         self.c.mine()
 
         self.wallet0.addRecipient(t.a2)
@@ -127,12 +127,12 @@ class TestSplitter(TestCase):
         self.assertEqual(self.wallet0.balanceOf(t.a1), 75000)
         self.assertEqual(self.wallet0.balanceOf(t.a2), 75000)
 
-        self.wallet0.withdraw(sender=t.k1)
+        self.wallet0.withdrawFor(t.a1)
         self.assertEqual(self.c.head_state.get_balance(self.wallet0.address), 75000)
         self.assertEqual(self.wallet0.balanceOf(t.a1), 0)
         self.assertEqual(self.wallet0.balanceOf(t.a2), 75000)
         self.assertEqual(self.wallet0.balanceTotal(), 75000)
-        self.wallet0.withdraw(sender=t.k2)
+        self.wallet0.withdrawFor(t.a2)
         self.assertEqual(self.wallet0.balanceOf(t.a2), 0)
         self.assertEqual(self.wallet0.balanceTotal(), 0)
 
@@ -141,8 +141,8 @@ class TestSplitter(TestCase):
         self.assertEqual(self.wallet0.balanceTotal(), 2)
         self.assertEqual(self.wallet0.balanceOf(t.a1), 1)
         self.assertEqual(self.wallet0.balanceOf(t.a2), 1)
-        self.wallet0.withdraw(sender=t.k1)
-        self.wallet0.withdraw(sender=t.k2)
+        self.wallet0.withdrawFor(t.a1)
+        self.wallet0.withdrawFor(t.a2)
         self.assertEqual(self.wallet0.balanceTotal(), 0)
         self.assertEqual(self.c.head_state.get_balance(self.wallet0.address), 1)
         self.c.tx(t.k0, self.wallet0.address, 5)
@@ -150,8 +150,8 @@ class TestSplitter(TestCase):
         self.assertEqual(self.wallet0.balanceTotal(), 6)
         self.assertEqual(self.wallet0.balanceOf(t.a1), 3)
         self.assertEqual(self.wallet0.balanceOf(t.a2), 3)
-        self.wallet0.withdraw(sender=t.k1)
-        self.wallet0.withdraw(sender=t.k2)
+        self.wallet0.withdrawFor(t.a1)
+        self.wallet0.withdrawFor(t.a2)
         self.assertEqual(self.wallet0.balanceTotal(), 0)
         self.assertEqual(self.c.head_state.get_balance(self.wallet0.address), 0)
 

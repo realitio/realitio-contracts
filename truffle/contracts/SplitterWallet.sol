@@ -17,7 +17,7 @@ This contract receives ETH normally, without using extra gas that could cause in
 Anyone can then call allocate() to assign any unassigned balance to the receivers.
 The `allocate()` call may leave a small amount of ETH unassigned due to rounding. This can be allocated in a future call.
 
-Once funds are allocated, each party can withdraw their own funds by calling `withdraw()`.
+Once funds are allocated, each party's funds can be sent to them by calling `withdrawFor(addr)`.
 */
 
 contract SplitterWallet is Owned {
@@ -119,17 +119,18 @@ contract SplitterWallet is Owned {
     }
 
     /// @notice Withdraw the address balance to the owner account
-    function withdraw() 
+    /// @param addr The address to withdraw from/to
+    function withdrawFor(address addr) 
     external {
 
-        uint256 bal = balanceOf[msg.sender];
+        uint256 bal = balanceOf[addr];
         require(bal > 0, "Balance must be positive");
 
         balanceTotal = balanceTotal.sub(bal);
-        balanceOf[msg.sender] = 0;
+        balanceOf[addr] = 0;
         msg.sender.transfer(bal);
 
-        emit LogWithdraw(msg.sender, bal);
+        emit LogWithdraw(addr, bal);
 
         assert(address(this).balance >= balanceTotal);
 
