@@ -79,6 +79,10 @@ def to_answer_for_contract(txt):
 def from_answer_for_contract(txt):
     return int(encode_hex(txt), 16)
 
+def subfee(bond):
+    fee = 40
+    return int(bond - int(bond/fee))
+
 class TestRealitio(TestCase):
 
     def assertZeroStatus(self, txid, msg=None):
@@ -448,29 +452,34 @@ class TestRealitio(TestCase):
         ##return
 
         #hist_hash = "0x" + encode_hex(self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH])
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 2, 4, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 4, 8, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 8, 16, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 16, 32, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 20, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 20, 40, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 40, 80, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 80, 160, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 160, 320, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 320, 640, sdr)
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 64+32+16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 640+subfee(320)+subfee(160)+subfee(80)+subfee(40)+subfee(20)+1000)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_bond_claim_same_person_contradicting_self(self):
         k3 = self.web3.eth.accounts[3]
         st = None
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 4, 8, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1004, 8, 16, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1003, 16, 32, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 20, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 20, 40, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 40, 80, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1004, 80, 160, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1003, 160, 320, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 320, 640, k3)
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 64+32+16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 640+subfee(320)+subfee(160)+subfee(80)+subfee(40)+subfee(20)+1000)
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_subfee(self):
+        self.assertEqual(subfee(100), 98)
+        self.assertEqual(subfee(1), 1)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_set_dispute_fee(self):

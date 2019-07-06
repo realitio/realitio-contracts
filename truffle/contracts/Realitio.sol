@@ -24,6 +24,9 @@ contract Realitio is BalanceHolder {
     // Commit->reveal timeout is 1/8 of the question timeout (rounded down).
     uint32 constant COMMITMENT_TIMEOUT_RATIO = 8;
 
+    // Proportion withheld when you claim an earlier bond.
+    uint256 constant BOND_CLAIM_FEE_PROPORTION = 40; // One 40th ie 2.5%
+
     event LogSetQuestionFee(
         address arbitrator,
         uint256 amount
@@ -535,6 +538,13 @@ contract Realitio is BalanceHolder {
  
             // Line the bond up for next time, when it will be added to somebody's queued_funds
             last_bond = bonds[i];
+
+            // Burn (just leave in contract balance) a fraction of all bonds except the final one.
+            // This creates a cost to increasing your own bond, which could be used to delay resolution maliciously
+            if (last_bond != questions[question_id].bond) {
+                last_bond = last_bond.sub(last_bond / BOND_CLAIM_FEE_PROPORTION);
+            }
+
             last_history_hash = history_hashes[i];
 
         }
@@ -625,7 +635,6 @@ contract Realitio is BalanceHolder {
                 // There should be enough for the fee, but if not, take what we have.
                 // There's an edge case involving weird arbitrator behaviour where we may be short.
                 uint256 answer_takeover_fee = (queued_funds >= bond) ? bond : queued_funds;
-
                 // Settle up with the old (higher-bonded) payee
                 _payPayee(question_id, payee, queued_funds.sub(answer_takeover_fee));
 
