@@ -663,8 +663,12 @@ contract RealitioERC20 is BalanceHolder {
         // We look at the referenced commitment ID and switch in the actual answer.
         if (is_commitment) {
             bytes32 commitment_id = answer;
-            // If it's a commit but it hasn't been revealed, it will always be considered wrong.
             if (!commitments[commitment_id].is_revealed) {
+                // Don't process until the commitment has timed out.
+                // This only happens with arbitration, and only if it happens crazy fast.
+                require(commitments[commitment_id].reveal_ts < uint32(now), "Commitment may yet be revealed, try again later");
+
+                // If it's a commit but it timed out without being revealed, it will always be considered wrong.
                 delete commitments[commitment_id];
                 return (queued_funds, payee);
             } else {
