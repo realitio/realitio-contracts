@@ -209,6 +209,38 @@ class TestRealitio(TestCase):
         self.assertEqual(question[QINDEX_BOUNTY], 1500)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_fund_increase_checks(self):
+
+        k0 = self.web3.eth.accounts[0]
+
+        txargs = self.standard_tx
+        txargs['value'] = 500
+
+        start_ts = self._block_timestamp()
+        qid = calculate_question_id(0, "my question test_fund_increase_checks", self.arb0.address, 10, start_ts + 10, 0, k0)
+
+        with self.assertRaises(TransactionFailed):
+            txid = self.rc0.functions.fundAnswerBounty(qid).transact(txargs)
+            self.raiseOnZeroStatus(txid)
+
+        self.rc0.functions.askQuestion(
+            0,
+            "my question test_fund_increase_checks",
+            self.arb0.address,
+            10,
+            start_ts + 10,
+            0
+        ).transact(self._txargs(val=100))
+
+        txid = self.rc0.functions.fundAnswerBounty(qid).transact(txargs)
+        self.raiseOnZeroStatus(txid)
+
+        self._advance_clock(33)
+
+        txid = self.rc0.functions.fundAnswerBounty(qid).transact(txargs)
+        self.raiseOnZeroStatus(txid)
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_no_response_finalization(self):
         # Should not be final if too soon
         self.assertFalse(self.rc0.functions.isFinalized(self.question_id).call())
