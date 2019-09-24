@@ -450,7 +450,8 @@ class TestRealitio(TestCase):
             st['answer'][0] = decode_hex(commitment_id[2:])
         else:
             if is_arbitrator:
-                self.arb0.functions.submitAnswerByArbitrator(qid, to_answer_for_contract(ans), 0, 0, sdr).transact(self._txargs(val=bond, sender=sdr))
+                txid = self.arb0.functions.submitAnswerByArbitrator(qid, to_answer_for_contract(ans), sdr).transact(self._txargs(val=0))
+                self.raiseOnZeroStatus(txid)
             else:
                 self.rc0.functions.submitAnswer(qid, to_answer_for_contract(ans), max_last).transact(self._txargs(val=bond, sender=sdr))
         st['nonce'].insert(0, nonce)
@@ -518,6 +519,37 @@ class TestRealitio(TestCase):
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
         self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 64+subfee(32)+subfee(16)+subfee(8)+subfee(4)+subfee(2)+1000)
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_bond_claim_unrevealed_commit(self):
+        k1 = self.web3.eth.accounts[1]
+        k3 = self.web3.eth.accounts[3]
+        st = None
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k1)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k1)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 4, 8, k1)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1004, 8, 16, k1)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 16, 32, k1, True)
+
+        fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
+        self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee))
+
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 0, k3, False, True)
+        #self._advance_clock(33)
+
+        with self.assertRaises(TransactionFailed):
+            txid = self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+            self.raiseOnZeroStatus(txid)
+
+        self._advance_clock(33)
+
+        txid = self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+        self.raiseOnZeroStatus(txid)
+
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 32+16-8+1000)
+
+
+
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_set_dispute_fee(self):
