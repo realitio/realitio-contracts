@@ -23,6 +23,9 @@ contract RealitioERC20 is BalanceHolder {
     // Commit->reveal timeout is 1/8 of the question timeout (rounded down).
     uint32 constant COMMITMENT_TIMEOUT_RATIO = 8;
 
+    // Proportion withheld when you claim an earlier bond.
+    uint256 constant BOND_CLAIM_FEE_PROPORTION = 50; // One 50th ie 2%
+
     event LogSetQuestionFee(
         address arbitrator,
         uint256 amount
@@ -604,6 +607,10 @@ contract RealitioERC20 is BalanceHolder {
  
             // Line the bond up for next time, when it will be added to somebody's queued_funds
             last_bond = bonds[i];
+
+            // Deduct the bond claim fee, and assign it to the arbitrator
+            last_bond = _applyBondClaimFee(question_id, last_bond);
+
             last_history_hash = history_hashes[i];
 
         }
@@ -637,6 +644,19 @@ contract RealitioERC20 is BalanceHolder {
         balanceOf[payee] = balanceOf[payee].add(value);
         emit LogClaim(question_id, payee, value);
     }
+
+	function _applyBondClaimFee(bytes32 question_id, uint256 bond)
+	internal returns (uint256) {
+		// Deduct a fraction of all bonds except the final one.
+		// This creates a cost to increasing your own bond, which could be used to delay resolution maliciously
+		if (bond != questions[question_id].bond) {
+			uint256 fee = bond / BOND_CLAIM_FEE_PROPORTION;
+			bond = bond.sub(fee);
+			address arbitrator = questions[question_id].arbitrator;
+			balanceOf[arbitrator] = balanceOf[arbitrator].add(fee);
+		}
+		return bond;
+	}
 
     function _verifyHistoryInputOrRevert(
         bytes32 last_history_hash,
