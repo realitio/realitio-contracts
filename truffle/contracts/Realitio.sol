@@ -150,6 +150,14 @@ contract Realitio is BalanceHolder {
         _;
     }
 
+    modifier stateOpenOrFuture(bytes32 question_id) {
+        require(questions[question_id].timeout > 0, "question must exist");
+        require(!questions[question_id].is_pending_arbitration, "question must not be pending arbitration");
+        uint32 finalize_ts = questions[question_id].finalize_ts;
+        require(finalize_ts == UNANSWERED || finalize_ts > uint32(now), "finalization deadline must not have passed");
+        _;
+    }
+
     modifier statePendingArbitration(bytes32 question_id) {
         require(questions[question_id].is_pending_arbitration, "question must be pending arbitration");
         _;
@@ -297,7 +305,7 @@ contract Realitio is BalanceHolder {
     /// @dev Add bounty funds after the initial question creation. Can be done any time until the question is finalized.
     /// @param question_id The ID of the question you wish to fund
     function fundAnswerBounty(bytes32 question_id) 
-        stateOpen(question_id)
+        stateOpenOrFuture(question_id)
     external payable {
         questions[question_id].bounty = questions[question_id].bounty.add(msg.value);
         emit LogFundAnswerBounty(question_id, msg.value, questions[question_id].bounty, msg.sender);

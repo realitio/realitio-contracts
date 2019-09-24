@@ -232,9 +232,8 @@ class TestRealitio(TestCase):
             0
         ).transact(self._txargs(val=100))
 
-        with self.assertRaises(TransactionFailed):
-            txid = self.rc0.functions.fundAnswerBounty(qid).transact(txargs)
-            self.raiseOnZeroStatus(txid)
+        txid = self.rc0.functions.fundAnswerBounty(qid).transact(txargs)
+        self.raiseOnZeroStatus(txid)
 
         self._advance_clock(33)
 

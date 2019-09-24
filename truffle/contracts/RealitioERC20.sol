@@ -149,6 +149,14 @@ contract RealitioERC20 is BalanceHolder {
         _;
     }
 
+    modifier stateOpenOrFuture(bytes32 question_id) {
+        require(questions[question_id].timeout > 0, "question must exist");
+        require(!questions[question_id].is_pending_arbitration, "question must not be pending arbitration");
+        uint32 finalize_ts = questions[question_id].finalize_ts;
+        require(finalize_ts == UNANSWERED || finalize_ts > uint32(now), "finalization deadline must not have passed");
+        _;
+    }
+
     modifier statePendingArbitration(bytes32 question_id) {
         require(questions[question_id].is_pending_arbitration, "question must be pending arbitration");
         _;
@@ -358,7 +366,7 @@ contract RealitioERC20 is BalanceHolder {
     /// @param question_id The ID of the question you wish to fund
     /// @param tokens The number of tokens to fund
     function fundAnswerBountyERC20(bytes32 question_id, uint256 tokens) 
-        stateOpen(question_id)
+        stateOpenOrFuture(question_id)
     external {
         _deductTokensOrRevert(tokens);
         questions[question_id].bounty = questions[question_id].bounty.add(tokens);

@@ -293,9 +293,8 @@ class TestRealitio(TestCase):
 			1000
         ).transact(self._txargs())
 
-        with self.assertRaises(TransactionFailed):
-            txid = self.rc0.functions.fundAnswerBountyERC20(qid, 10).transact()
-            self.raiseOnZeroStatus(txid)
+        txid = self.rc0.functions.fundAnswerBountyERC20(qid, 10).transact()
+        self.raiseOnZeroStatus(txid)
 
         self._advance_clock(33)
 
