@@ -42,6 +42,8 @@ QINDEX_BEST_ANSWER = 7
 QINDEX_HISTORY_HASH = 8
 QINDEX_BOND = 9
 
+BOND_CLAIM_FEE_PROPORTION = 50
+
 def calculate_answer_hash(answer, nonce):
     if answer[:2] == "0x":
         raise Exception("hash functions expect bytes for bytes32 parameters")
@@ -78,6 +80,12 @@ def to_answer_for_contract(txt):
 
 def from_answer_for_contract(txt):
     return int(encode_hex(txt), 16)
+
+def subfee(bond):
+    return int(bond - int(bond/BOND_CLAIM_FEE_PROPORTION))
+
+def arbfee(bond):
+    return int(bond/BOND_CLAIM_FEE_PROPORTION)
 
 class TestRealitio(TestCase):
 
@@ -577,8 +585,15 @@ class TestRealitio(TestCase):
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 16, 32, sdr)
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, sdr)
         self._advance_clock(33)
+
+        arb_start = self.rc0.functions.balanceOf(self.arb0.address).call()
+
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 64+32+16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 64+subfee(32)+subfee(16)+subfee(8)+subfee(4)+subfee(2)+1000)
+
+        arb_end = self.rc0.functions.balanceOf(self.arb0.address).call()
+        self.assertEqual(arb_start + arbfee(32) + arbfee(16) + arbfee(8) + arbfee(4) + arbfee(2), arb_end, "All subtracted fees went to arbitrator")
+
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_bond_claim_same_person_contradicting_self(self):
@@ -593,7 +608,7 @@ class TestRealitio(TestCase):
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, k3)
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 64+32+16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 64+subfee(32)+subfee(16)+subfee(8)+subfee(4)+subfee(2)+1000)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_set_dispute_fee(self):
@@ -665,7 +680,7 @@ class TestRealitio(TestCase):
         self.arb0.functions.submitAnswerByArbitrator(self.question_id, to_answer_for_contract(1001), k4).transact() 
 
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 16+subfee(8)+subfee(4)+subfee(2)+1000)
 
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
@@ -684,7 +699,7 @@ class TestRealitio(TestCase):
         self.rc0.functions.claimWinnings(self.question_id, st['hash'][:2], st['addr'][:2], st['bond'][:2], st['answer'][:2]).transact()
         self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 16+1000)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'][2:], st['addr'][2:], st['bond'][2:], st['answer'][2:]).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 16+subfee(8)+subfee(4)+subfee(2)+1000)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_bond_claim_after_reveal_fail(self):
@@ -709,8 +724,8 @@ class TestRealitio(TestCase):
     
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k6).call(), 32+16+8+4+2-1+1000)
-        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 1+1)
+        self.assertEqual(self.rc0.functions.balanceOf(k6).call(), 32+subfee(16)+subfee(8)+subfee(4)+subfee(2)-1+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), subfee(1)+1)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_bond_claim_split_over_transactions_payee_later(self):
@@ -736,8 +751,8 @@ class TestRealitio(TestCase):
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'][:2], st['addr'][:2], st['bond'][:2], st['answer'][:2]).transact()
         self.rc0.functions.claimWinnings(self.question_id, st['hash'][2:], st['addr'][2:], st['bond'][2:], st['answer'][2:]).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k6).call(), 32+16+8+4+2-1+1000)
-        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 1+1)
+        self.assertEqual(self.rc0.functions.balanceOf(k6).call(), 32+subfee(16)+subfee(8)+subfee(4)+subfee(2)-1+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), subfee(1)+1)
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_answer_reveal_calculation(self):
@@ -918,7 +933,7 @@ class TestRealitio(TestCase):
         self.arb0.functions.submitAnswerByArbitrator(self.question_id, to_answer_for_contract(1002), k3).transact(self._txargs(val=0)) 
 
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 16+subfee(8)+subfee(4)+subfee(2)+1000)
 
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
@@ -1153,7 +1168,7 @@ class TestRealitio(TestCase):
         #  - their bond again (4)
         #  - the accumulated bonds until their last answer (1 + 2)
 
-        k4bal = 4 + 4 + 1 + 2
+        k4bal = 4 + subfee(4) + subfee(1) + subfee(2)
         self.rc0.functions.claimWinnings(self.question_id, claim_args_state[::-1], claim_args_addrs[::-1], claim_args_bonds[::-1], claim_args_answs[::-1]).transact()
 
         self.assertEqual(self.rc0.functions.balanceOf(k4).call(), k4bal, "First answerer gets double their bond, plus earlier bonds")
@@ -1162,7 +1177,7 @@ class TestRealitio(TestCase):
         #  - their bond back (22)
         #  - the bond of the previous guy, who was wrong (11)
         #  - ...minus the payment to the lower guy (-4)
-        k5bal = 22 + 11 - 4 + 1000
+        k5bal = 22 + subfee(11) - 4 + 1000
         self.assertEqual(self.rc0.functions.balanceOf(k5).call(), k5bal, "Final answerer gets the bounty, plus their bond, plus earlier bonds up to when they took over the answer, minus the bond of the guy lower down with the right answer")
 
         self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 0, "Wrong answerers get nothing")
@@ -1217,7 +1232,7 @@ class TestRealitio(TestCase):
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 8, 16, k3)
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 16, 32, k3)
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, k3)
-        claimable = 64+32+16+8+4+2+1000
+        claimable = 64+subfee(32)+subfee(16)+subfee(8)+subfee(4)+subfee(2)+1000
 
         self._advance_clock(33)
 
