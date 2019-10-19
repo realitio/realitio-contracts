@@ -1,0 +1,38 @@
+{
+ "networks": {
+  "1": {
+   "0x325a2e0f3cca2ddbaebb4dfc38df8d19ca165b47": {
+    "arbitrators": {
+     "0xdc0a2185031ecf89f091a39c63c2857a7d5c301a": "Realitio Team",
+     "0xd47f72a2d1d0E91b0Ec5e5f5d02B2dc26d00A14D": "Kleros"
+    },
+    "start_block": 6531147
+   }
+  },
+  "4": {
+   "0x3D00D77ee771405628a4bA4913175EcC095538da": {
+    "arbitrators": {
+     "0x02321745bE4a141E78db6C39834396f8df00e2a0": "Realitio Team (rinkeby main)"
+    },
+    "start_block": 3175028
+   }
+  },
+  "42": {
+   "0x50e35a1ed424ab9c0b8c7095b3d9ec2fb791a168": {
+    "arbitrators": {
+     "0xB4683794998215B59a429e86c3A33F796F9aeb0f": "Realitio Team (dev)",
+     "0xA6EAd513D05347138184324392d8ceb24C116118": "Kleros"
+    },
+    "start_block": 10350865
+   }
+  },
+  "123411710": {
+   "0xa4c32Ec8E9dfb7F1CB768742292905fE1557F0F4": {
+    "arbitrators": {
+     "0x7864bE090E692D695ce33BaaA58be824Ab4f5350": "Ganache bootstrap test arbitrator"
+    },
+    "start_block": 5287383
+   }
+  }
+ }
+}

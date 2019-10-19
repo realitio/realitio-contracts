@@ -1,6 +1,7 @@
 const fs = require('fs');
 const etherlime = require('etherlime-lib');
-const build_dir = './../build/contracts/';
+const build_dir = './../build/contracts/'; // The standard Truffle build files
+const config_dir = './../../config/'; // Config file specifying realitio and arbitrator contracts
 const contract_templates = {
     'Realitio': require(build_dir + 'Realitio.json'),
     'RealitioERC20': require(build_dir + 'RealitioERC20.json'),
@@ -59,7 +60,6 @@ if (arb_fee == undef) {
     arb_fee = "0xde0b6b3a76400000";
 }
 
-
 const priv = fs.readFileSync('./secrets/' + network + '.sec', 'utf8').replace(/\n/, '')
 
 if (task == 'Realitio') {
@@ -72,9 +72,16 @@ if (task == 'Realitio') {
     deployERC20();
 }
 
+// Standard truffle-created contract definition, for the token specified
 function token_contract_file(contract_type, path, token) {
     var token_part = (token == 'ETH') ? '' :  '.'+token;
     return path + contract_type + token_part +'.json';
+}
+
+// Our per-token config file listing all deployed contracts and their arbitrators
+function token_config_file(path, token) {
+    var token_part = (token == 'ETH') ? '' :  '.'+token;
+    return path + 'contracts' + token_part +'.json';
 }
 
 function load_or_create(contract_type, path, token) {
@@ -85,6 +92,41 @@ function load_or_create(contract_type, path, token) {
         rc = contract_templates[contract_type];
     }
     return rc;
+}
+
+function load_or_create_config(path, token) {
+    var config_file = token_config_file(path, token);
+    var cf;
+    if (fs.existsSync(config_file)) {
+        cf = require(config_file);
+    } else {
+        cf = {};
+    }
+    return cf;
+}
+
+function store_deployed_config(path, token, network_id, realitio_addr, start_block, arbitrator_addr, arbitrator_txt) {
+    var cf = load_or_create_config(path, token);
+    if (!cf['networks']) {
+        cf['networks'] = {};
+    }
+    if (!cf['networks'][""+network_id]) {
+        cf['networks'][""+network_id] = {};
+    }
+    if (!cf['networks'][""+network_id][realitio_addr]) {
+        cf['networks'][""+network_id][realitio_addr] = {
+            "arbitrators": {},
+            "start_block": start_block
+        };
+    }
+    if (arbitrator_addr != undef) {
+        if (arbitrator_txt == undef) {
+            arbitrator_txt = "TODO";
+        }
+        cf['networks'][""+network_id][realitio_addr]["arbitrators"][arbitrator_addr] = arbitrator_txt;
+    }
+    fs.writeFileSync(token_config_file(path, token), JSON.stringify(cf, null, " "));
+    return cf; 
 }
 
 function store_deployed_contract(contract_type, path, token, address) {
@@ -105,21 +147,43 @@ function store_deployed_contract(contract_type, path, token, address) {
 async function deployRealitio() {
     console.log('Deploying Realitio...');
     const deployer = new etherlime.InfuraPrivateKeyDeployer(priv, network, null, defaultConfigs);
+
+    // Get the current block for the config file
+    // TODO: This will be a bit earlier than it should be.
+    // Ideally we should get the transaction receipt back from the deployer and use the actual block deployed
+    const latest_block = await deployer.provider.getBlock('latest');
+    const block_number = latest_block.number;
+
     var result = await deployer.deploy(contract_templates['Realitio'], {})
     console.log('Storing address', result.contractAddress, '...');
+
     store_deployed_contract('Realitio', build_dir, token_name, result.contractAddress); 
+    store_deployed_config(config_dir, token_name, network_id, result.contractAddress, block_number);
+
     console.log('Deployment complete.');
 }
 
 async function deployRealitioERC20() {
+
     console.log('Deploying Realitio (ERC20 version)');
     const deployer = new etherlime.InfuraPrivateKeyDeployer(priv, network, null, defaultConfigs);
+
+    // Get the current block for the config file
+    // TODO: This will be a bit earlier than it should be.
+    // Ideally we should get the transaction receipt back from the deployer and use the actual block deployed
+    const latest_block = await deployer.provider.getBlock('latest');
+    const block_number = latest_block.number;
+
     var result = await deployer.deploy(contract_templates['RealitioERC20'], {})
     console.log('Storing address', result.contractAddress, '...');
     store_deployed_contract('Realitio', build_dir, token_name, result.contractAddress); 
     console.log('Setting token address to ', token_address, '...');
     var r1 = await result.setToken(token_address);
+
+    store_deployed_config(config_dir, token_name, network_id, result.contractAddress, block_number);
+
     console.log('Deployment complete.');
+
 }
 
 
@@ -146,6 +210,8 @@ async function deployArbitrator() {
         console.log('Transferring ownership...', arbitrator_owner);
         var r4 = await result.transferOwnership(arbitrator_owner);
     }
+
+    store_deployed_config(config_dir, token_name, network_id, addr, 0, result.contractAddress, "Enter arbitrator description here...");
 
     console.log('Deployment complete.');
 }
