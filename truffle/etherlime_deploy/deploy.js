@@ -59,10 +59,6 @@ if (arb_fee == undef) {
     arb_fee = "0xde0b6b3a76400000";
 }
 
-if (arbitrator_owner == undef) {
-    arbitrator_owner = "0xdd8a989e5e89ad23ed2f91c6f106aea678a1a3d0";
-}
-
 
 const priv = fs.readFileSync('./secrets/' + network + '.sec', 'utf8').replace(/\n/, '')
 
