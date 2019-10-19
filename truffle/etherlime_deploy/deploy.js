@@ -18,7 +18,7 @@ const defaultConfigs = {
 const task = process.argv[2]
 const network = process.argv[3]
 const token_name = process.argv[4]
-const token_address = process.argv[5]
+var token_address = process.argv[5]
 var arb_fee = process.argv[6]
 var arbitrator_owner = process.argv[7]
 
@@ -52,8 +52,13 @@ if (token_name == undef) {
     usage_error("token_name not supplied");
 }
 
-if ((token_address == undef) && (task != 'ERC20') && (token_name != 'ETH') && (task != 'Arbitrator')) {
-    usage_error("token_address not supplied");
+if ((token_address == undef) && (task == 'RealitioERC20')) {
+    // Fetch the token address from the token definition file
+    var tk = load_or_create('ERC20', build_dir, token_name);
+    if (!tk['networks'] || !tk['networks'][""+network_id] || !tk['networks'][""+network_id]['address']) {
+        usage_error("token_address not supplied and could not be loaded for the token", token_name);
+    }
+    token_address = tk['networks'][""+network_id]['address'];
 }
 
 if (arb_fee == undef) {
@@ -217,12 +222,21 @@ async function deployArbitrator() {
 }
 
 async function deployERC20() {
-    console.log('Deploying an ERC20 token', token_name, '...');
-    const deployer = new etherlime.InfuraPrivateKeyDeployer(priv, network, null, defaultConfigs);
-    var result = await deployer.deploy(contract_templates['ERC20'], {});
 
-    console.log('Storing address', result.contractAddress, '...');
-    store_deployed_contract('ERC20', build_dir, token_name, result.contractAddress); 
+    if (token_address != undef) {
 
-    console.log('Deployment complete.');
+        console.log('Address supplied for an ERC20 token so just storing config', token_name, token_address);
+        store_deployed_contract('ERC20', build_dir, token_name, token_address); 
+
+    } else {
+
+        console.log('Deploying an ERC20 token', token_name, '...');
+        const deployer = new etherlime.InfuraPrivateKeyDeployer(priv, network, null, defaultConfigs);
+        var result = await deployer.deploy(contract_templates['ERC20'], {});
+
+        console.log('Storing address', result.contractAddress, '...');
+        store_deployed_contract('ERC20', build_dir, token_name, result.contractAddress); 
+
+        console.log('Deployment complete.');
+    }
 }
