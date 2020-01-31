@@ -21,7 +21,7 @@
   "license": "GPL-3.0",
   "dependencies": {},
   "devDependencies": {
-    "truffle": "^4.0.1"
+    "truffle": "^5.1.11"
   },
   "repository": {
     "type": "git",

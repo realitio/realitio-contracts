@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity >=0.4.24;
 
 import './Arbitrator.sol';
 import './IERC20.sol';
@@ -24,7 +24,7 @@ contract RegisteredWalletArbitrator is Arbitrator {
     /// @notice Withdraw money from the arbitrator contract to our registered wallet
     function withdrawToRegisteredWalletERC20(IERC20 _token)
     external {
-        require(registered_wallet != 0x0, "No wallet is registered");
+        require(registered_wallet != address(0x0), "No wallet is registered");
         uint256 bal = _token.balanceOf(address(this));
         _token.transfer(registered_wallet, bal);
     }
@@ -32,8 +32,9 @@ contract RegisteredWalletArbitrator is Arbitrator {
     /// @notice Withdraw money from the arbitrator contract to our registered wallet
     function withdrawToRegisteredWallet()
     external {
-        require(registered_wallet != 0x0, "No wallet is registered");
-        registered_wallet.transfer(address(this).balance);
+        require(registered_wallet != address(0x0), "No wallet is registered");
+        (bool success,) = registered_wallet.call.value(address(this).balance).gas(2300)("");
+        require(success); 
     }
 
     /// @notice Change the address of our registered wallet
@@ -42,7 +43,7 @@ contract RegisteredWalletArbitrator is Arbitrator {
     function updateRegisteredWallet(address addr) 
         onlyOwner
     external {
-        registered_wallet= addr;
+        registered_wallet = addr;
     }
 
 }

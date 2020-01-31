@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity >=0.4.24;
 
 import './Owned.sol';
 import './Realitio.sol';
@@ -143,7 +143,10 @@ contract Arbitrator is Owned {
     function withdraw(address addr) 
         onlyOwner 
     public {
-        addr.transfer(address(this).balance); 
+        // should use addr.transfer(address(this).balance) here
+        // but solc 0.5 requires addr to be address payable type
+        (bool success,) = addr.call.value(address(this).balance).gas(2300)("");
+        require(success); 
     }
 
     /// @notice Withdraw any accumulated token fees to the specified address
@@ -171,7 +174,7 @@ contract Arbitrator is Owned {
     }
 
     /// @notice Set a metadata string, expected to be JSON, containing things like arbitrator TOS address
-    function setMetaData(string _metadata) 
+    function setMetaData(string memory _metadata) 
         onlyOwner
     public {
         metadata = _metadata;
