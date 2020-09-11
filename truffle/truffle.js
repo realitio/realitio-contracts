@@ -8,10 +8,15 @@ module.exports = {
       gas: 5000000
     }
   },
-  solc: {
-    optimizer: {
-      enabled: true,
-      runs: 200
+  compilers: {
+    solc: {
+      version: 'v0.4.26',
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200
+        }
+      }
     }
   }
 };

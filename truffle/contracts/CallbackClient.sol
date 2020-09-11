@@ -1,4 +1,4 @@
-pragma solidity ^0.4.6;
+pragma solidity >=0.4.6;
 
 contract CallbackClient {
 
@@ -10,9 +10,9 @@ contract CallbackClient {
         address sender
     );
 
-    function __realitycheck_callback(bytes32 question_id, bytes32 question_answer) {
+    function __realitycheck_callback(bytes32 question_id, bytes32 question_answer) external {
         answers[question_id] = question_answer;
-        LogCallback(question_id, question_answer, msg.sender);
+        emit LogCallback(question_id, question_answer, msg.sender);
     }
 
 }

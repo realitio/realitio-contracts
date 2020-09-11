@@ -1,4 +1,4 @@
-pragma solidity ^0.4.24;
+pragma solidity >=0.4.24;
 
 import './RealitioSafeMath256.sol';
 import './RealitioSafeMath32.sol';
@@ -208,7 +208,7 @@ contract Realitio is BalanceHolder {
     /// @dev Template data is only stored in the event logs, but its block number is kept in contract storage.
     /// @param content The template content
     /// @return The ID of the newly-created template, which is created sequentially.
-    function createTemplate(string content) 
+    function createTemplate(string memory content) 
         stateAny()
     public returns (uint256) {
         uint256 id = nextTemplateID;
@@ -229,8 +229,8 @@ contract Realitio is BalanceHolder {
     /// @param nonce A user-specified nonce used in the question ID. Change it to repeat a question.
     /// @return The ID of the newly-created template, which is created sequentially.
     function createTemplateAndAskQuestion(
-        string content, 
-        string question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce 
+        string memory content, 
+        string memory question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce 
     ) 
         // stateNotCreated is enforced by the internal _askQuestion
     public payable returns (bytes32) {
@@ -247,7 +247,7 @@ contract Realitio is BalanceHolder {
     /// @param opening_ts If set, the earliest time it should be possible to answer the question.
     /// @param nonce A user-specified nonce used in the question ID. Change it to repeat a question.
     /// @return The ID of the newly-created question, created deterministically.
-    function askQuestion(uint256 template_id, string question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce) 
+    function askQuestion(uint256 template_id, string memory question, address arbitrator, uint32 timeout, uint32 opening_ts, uint256 nonce) 
         // stateNotCreated is enforced by the internal _askQuestion
     public payable returns (bytes32) {
 
@@ -505,7 +505,10 @@ contract Realitio is BalanceHolder {
     /// @param answers Last-to-first, each answer supplied, or commitment ID if the answer was supplied with commit->reveal
     function claimWinnings(
         bytes32 question_id, 
-        bytes32[] history_hashes, address[] addrs, uint256[] bonds, bytes32[] answers
+        bytes32[] memory history_hashes,
+        address[] memory addrs,
+        uint256[] memory bonds,
+        bytes32[] memory answers
     ) 
         stateFinalized(question_id)
     public {
@@ -652,8 +655,13 @@ contract Realitio is BalanceHolder {
     /// @param bonds In a single list for all supplied questions, the bond supplied with each answer or commitment
     /// @param answers In a single list for all supplied questions, each answer supplied, or commitment ID 
     function claimMultipleAndWithdrawBalance(
-        bytes32[] question_ids, uint256[] lengths, 
-        bytes32[] hist_hashes, address[] addrs, uint256[] bonds, bytes32[] answers
+        bytes32[] memory question_ids,
+        uint256[] memory lengths,
+
+        bytes32[] memory hist_hashes,
+        address[] memory addrs,
+        uint256[] memory bonds,
+        bytes32[] memory answers
     ) 
         stateAny() // The finalization checks are done in the claimWinnings function
     public {
