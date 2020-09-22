@@ -429,7 +429,7 @@ contract Realitio is BalanceHolder {
     function submitAnswerByArbitrator(bytes32 question_id, bytes32 answer, address answerer) 
         onlyArbitrator(question_id)
         statePendingArbitration(question_id)
-    external {
+    public {
 
         require(answerer != NULL_ADDRESS, "answerer must be provided");
         emit LogFinalize(question_id, answer);
@@ -438,6 +438,36 @@ contract Realitio is BalanceHolder {
         _addAnswerToHistory(question_id, answer, answerer, 0, false);
         _updateCurrentAnswer(question_id, answer, 0);
 
+    }
+
+    /// @notice Submit the answer for a question, for use by the arbitrator, working out the appropriate winner based on the last answer details.
+    /// @dev Doesn't require (or allow) a bond.
+    /// @param question_id The ID of the question
+    /// @param answer The answer, encoded into bytes32
+    /// @param payee The account to by credited as winner if the last answer given is wrong, usually the account that paid the arbitrator
+    /// @param last_history_hash The history hash before the final one
+    /// @param last_answer_or_commitment_id The last answer given, or the commitment ID if it was a commitment.
+    /// @param last_answerer The address that supplied the last answer
+    function submitAnswerByArbitratorAndAssignWinner(bytes32 question_id, bytes32 answer, address payee, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, address last_answerer) 
+        onlyArbitrator(question_id)
+        statePendingArbitration(question_id)
+    public {
+        bool is_commitment = _verifyHistoryInputOrRevert(questions[question_id].history_hash, last_history_hash, last_answer_or_commitment_id, questions[question_id].bond, last_answerer);
+        if (is_commitment) {
+            if (!commitments[last_answer_or_commitment_id].is_revealed) {
+                require(commitments[last_answer_or_commitment_id].reveal_ts < uint32(now), "You must wait for the reveal deadline before finalizing");
+                // No answer, leave the payee to the default
+            } else {
+                if (commitments[last_answer_or_commitment_id].revealed_answer == answer) {
+                    payee = last_answerer;
+                }
+            }
+        } else {
+            if (last_answer_or_commitment_id == answer) {
+                payee = last_answerer;
+            }
+        }
+        submitAnswerByArbitrator(question_id, answer, payee);
     }
 
     /// @notice Report whether the answer to the specified question is finalized
