@@ -455,8 +455,8 @@ contract Realitio is BalanceHolder {
         bool is_commitment = _verifyHistoryInputOrRevert(questions[question_id].history_hash, last_history_hash, last_answer_or_commitment_id, questions[question_id].bond, last_answerer);
 
         address payee;
-        // For an unrevealed commit, the answer is always wrong.
-        // For anything else, the last answer was set as the "best answer" in submitAnswerReveal.
+        // If the last answer is an unrevealed commit, it's is always wrong.
+        // For anything else, the last answer was set as the "best answer" in submitAnswer or submitAnswerReveal.
         if (is_commitment && !commitments[last_answer_or_commitment_id].is_revealed) {
             require(commitments[last_answer_or_commitment_id].reveal_ts < uint32(now), "You must wait for the reveal deadline before finalizing");
             payee = payee_if_wrong;
