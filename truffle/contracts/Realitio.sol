@@ -444,28 +444,24 @@ contract Realitio is BalanceHolder {
     /// @dev Doesn't require (or allow) a bond.
     /// @param question_id The ID of the question
     /// @param answer The answer, encoded into bytes32
-    /// @param payee The account to by credited as winner if the last answer given is wrong, usually the account that paid the arbitrator
+    /// @param payee_if_wrong The account to by credited as winner if the last answer given is wrong, usually the account that paid the arbitrator
     /// @param last_history_hash The history hash before the final one
     /// @param last_answer_or_commitment_id The last answer given, or the commitment ID if it was a commitment.
     /// @param last_answerer The address that supplied the last answer
-    function submitAnswerByArbitratorAndAssignWinner(bytes32 question_id, bytes32 answer, address payee, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, address last_answerer) 
+    function submitAnswerByArbitratorAndAssignWinner(bytes32 question_id, bytes32 answer, address payee_if_wrong, bytes32 last_history_hash, bytes32 last_answer_or_commitment_id, address last_answerer) 
         onlyArbitrator(question_id)
         statePendingArbitration(question_id)
-    public {
+    external {
         bool is_commitment = _verifyHistoryInputOrRevert(questions[question_id].history_hash, last_history_hash, last_answer_or_commitment_id, questions[question_id].bond, last_answerer);
-        if (is_commitment) {
-            if (!commitments[last_answer_or_commitment_id].is_revealed) {
-                require(commitments[last_answer_or_commitment_id].reveal_ts < uint32(now), "You must wait for the reveal deadline before finalizing");
-                // No answer, leave the payee to the default
-            } else {
-                if (commitments[last_answer_or_commitment_id].revealed_answer == answer) {
-                    payee = last_answerer;
-                }
-            }
+
+        address payee;
+        // For an unrevealed commit, the answer is always wrong.
+        // For anything else, the last answer was set as the "best answer" in submitAnswerReveal.
+        if (is_commitment && !commitments[last_answer_or_commitment_id].is_revealed) {
+            require(commitments[last_answer_or_commitment_id].reveal_ts < uint32(now), "You must wait for the reveal deadline before finalizing");
+            payee = payee_if_wrong;
         } else {
-            if (last_answer_or_commitment_id == answer) {
-                payee = last_answerer;
-            }
+            payee = (questions[question_id].best_answer == answer) ? last_answerer : payee_if_wrong;
         }
         submitAnswerByArbitrator(question_id, answer, payee);
     }
