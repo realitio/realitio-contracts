@@ -528,6 +528,20 @@ contract Realitio_v2_1 is BalanceHolder {
         return questions[question_id].best_answer;
     }
 
+    function _subtractClaimFee(bytes32 question_id, uint256 last_bond) 
+    internal returns (uint256) {
+
+        address arbitrator = questions[question_id].arbitrator;
+        // Give the arbitrator a fraction of all bonds except the final one.
+        // This creates a cost to increasing your own bond, which could be used to delay resolution maliciously
+        if (last_bond != questions[question_id].bond) {
+            uint256 claim_fee = last_bond / BOND_CLAIM_FEE_PROPORTION;
+            last_bond = last_bond.sub(claim_fee);
+            balanceOf[arbitrator] = balanceOf[arbitrator].add(claim_fee);
+        }
+        return last_bond;
+
+    }
 
     /// @notice Return the final answer to the specified question, provided it matches the specified criteria.
     /// @dev Reverts if the question is not finalized, or if it does not match the specified criteria.
@@ -596,14 +610,7 @@ contract Realitio_v2_1 is BalanceHolder {
                 addrs[i], bonds[i], answers[i], is_commitment);
  
             // Line the bond up for next time, when it will be added to somebody's queued_funds
-            last_bond = bonds[i];
-
-            // Burn (just leave in contract balance) a fraction of all bonds except the final one.
-            // This creates a cost to increasing your own bond, which could be used to delay resolution maliciously
-            if (last_bond != questions[question_id].bond) {
-                last_bond = last_bond.sub(last_bond / BOND_CLAIM_FEE_PROPORTION);
-            }
-
+            last_bond = _subtractClaimFee(question_id, bonds[i]);
             last_history_hash = history_hashes[i];
 
         }
