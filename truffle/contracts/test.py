@@ -762,7 +762,8 @@ class TestRealitio(TestCase):
 
         arb_end = self.rc0.functions.balanceOf(self.arb0.address).call()
 
-        self.assertTrue(arb_end > arb_start, "The arbitator got fees")
+        if CLAIM_FEE > 0:
+            self.assertTrue(arb_end > arb_start, "The arbitator got fees")
         self.assertEqual(arb_start + arbfee(320) + arbfee(160) + arbfee(80) + arbfee(40) + arbfee(20), arb_end, "All subtracted fees went to arbitrator")
 
 
