@@ -88,6 +88,13 @@ def subfee(bond):
         fee = CLAIM_FEE
         return int(bond - int(bond/fee))
 
+def arbfee(bond):
+    if CLAIM_FEE == 0:
+        return 0
+    else:
+        fee = CLAIM_FEE
+        return int(bond/fee)
+
 class TestRealitio(TestCase):
 
     def assertZeroStatus(self, txid, msg=None):
@@ -449,9 +456,9 @@ class TestRealitio(TestCase):
         st['answer'].insert(0, arb_answer)
         st['addr'].insert(0, k4)
 
+
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
         self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 2+subfee(4)+subfee(8)+subfee(16)+1000, "The last answerer gets it all for a right answer")
-
 
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
@@ -747,8 +754,18 @@ class TestRealitio(TestCase):
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 160, 320, sdr)
         st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 320, 640, sdr)
         self._advance_clock(33)
+
+        arb_start = self.rc0.functions.balanceOf(self.arb0.address).call()
+
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
         self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 640+subfee(320)+subfee(160)+subfee(80)+subfee(40)+subfee(20)+1000)
+
+        arb_end = self.rc0.functions.balanceOf(self.arb0.address).call()
+
+        self.assertTrue(arb_end > arb_start, "The arbitator got fees")
+        self.assertEqual(arb_start + arbfee(320) + arbfee(160) + arbfee(80) + arbfee(40) + arbfee(20), arb_end, "All subtracted fees went to arbitrator")
+
+
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_bond_claim_same_person_contradicting_self(self):
