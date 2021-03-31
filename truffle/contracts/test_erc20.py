@@ -461,6 +461,242 @@ class TestRealitio(TestCase):
 
 
 
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_arbitrator_answering_assigning_answerer_right(self):
+
+        if REALITIO_CONTRACT != 'RealitioERC20_v2_1':
+            print("Skipping test_arbitrator_answering_assigning_answerer_right, not a feature of this contract")
+            return
+
+        k2 = self.web3.eth.accounts[2]
+        k3 = self.web3.eth.accounts[3]
+        k4 = self.web3.eth.accounts[4]
+
+        self._issueTokens(k2, 1000000, 1000000)
+        self._issueTokens(k3, 1000000, 1000000)
+        self._issueTokens(k4, 1000000, 1000000)
+
+        st = None
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k4)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 4, 8, k3)
+
+        last_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 8, 16, k4)
+
+        fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
+        self.assertTrue(self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee)), "Requested arbitration")
+
+        arb_answer = to_answer_for_contract(1001)
+        arb_payer = keys.privtoaddr(t.k2)
+
+        hist_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        # Only the arbitrator can do this
+        with self.assertRaises(TransactionFailed):
+            self.rc0.functions.assignWinnerAndSubmitAnswerByArbitrator(self.question_id, arb_answer, arb_payer, st['hash'][0], st['answer'][0], st['addr'][0] ).transact()
+
+        self.arb0.functions.assignWinnerAndSubmitAnswerByArbitrator(self.question_id, arb_answer, arb_payer, st['hash'][0], st['answer'][0], st['addr'][0] ).transact()
+
+        st['hash'].insert(0, hist_hash)
+        st['bond'].insert(0, 0)
+        st['answer'].insert(0, arb_answer)
+        st['addr'].insert(0, k4)
+
+        self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 2+subfee(4)+subfee(8)+subfee(16)+1000, "The last answerer gets it all for a right answer")
+
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_arbitrator_answering_assigning_answerer_right_commit(self):
+
+        if REALITIO_CONTRACT != 'RealitioERC20_v2_1':
+            print("Skipping test_arbitrator_answering_assigning_answerer_right_commit, not a feature of this contract")
+            return
+
+        k2 = self.web3.eth.accounts[2]
+        k3 = self.web3.eth.accounts[3]
+        k4 = self.web3.eth.accounts[4]
+
+        self._issueTokens(k2, 1000000, 1000000)
+        self._issueTokens(k3, 1000000, 1000000)
+        self._issueTokens(k4, 1000000, 1000000)
+
+        st = None
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k4)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 4, 8, k3)
+
+        last_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 8, 16, k4, True)
+        nonce = st['nonce'][0]
+        self.rc0.functions.submitAnswerReveal( self.question_id, to_answer_for_contract(1001), nonce, 16).transact(self._txargs(sender=k4, val=0))
+
+        fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
+        self.assertTrue(self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee)), "Requested arbitration")
+
+        arb_answer = to_answer_for_contract(1001)
+        arb_payer = keys.privtoaddr(t.k2)
+
+        hist_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        self.arb0.functions.assignWinnerAndSubmitAnswerByArbitrator(self.question_id, arb_answer, arb_payer, st['hash'][0], st['answer'][0], st['addr'][0] ).transact()
+
+        st['hash'].insert(0, hist_hash)
+        st['bond'].insert(0, 0)
+        st['answer'].insert(0, arb_answer)
+        st['addr'].insert(0, k4)
+
+
+        self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 2+subfee(4)+subfee(8)+subfee(16)+1000, "The last answerer gets it all for a right answer")
+
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_arbitrator_answering_assigning_answerer_wrong(self):
+
+        if REALITIO_CONTRACT != 'RealitioERC20_v2_1':
+            print("Skipping test_arbitrator_answering_assigning_answerer_wrong, not a feature of this contract")
+            return
+
+        k2 = self.web3.eth.accounts[2]
+        k3 = self.web3.eth.accounts[3]
+        k4 = self.web3.eth.accounts[4]
+
+        self._issueTokens(k2, 1000000, 1000000)
+        self._issueTokens(k3, 1000000, 1000000)
+        self._issueTokens(k4, 1000000, 1000000)
+
+        st = None
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k4)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 4, 8, k3)
+
+        last_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 8, 16, k4)
+
+        fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
+        self.assertTrue(self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee)), "Requested arbitration")
+
+        arb_answer = to_answer_for_contract(123456)
+        arb_payer = keys.privtoaddr(t.k2)
+
+        hist_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        self.arb0.functions.assignWinnerAndSubmitAnswerByArbitrator(self.question_id, arb_answer, arb_payer, st['hash'][0], st['answer'][0], st['addr'][0] ).transact()
+
+        st['hash'].insert(0, hist_hash)
+        st['bond'].insert(0, 0)
+        st['answer'].insert(0, arb_answer)
+        st['addr'].insert(0, arb_payer)
+
+        self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+        self.assertEqual(self.rc0.functions.balanceOf(arb_payer).call(), 2+subfee(4)+subfee(8)+subfee(16)+1000, "The arb payer gets it all for a wrong answer")
+
+
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_arbitrator_answering_assigning_answerer_unrevealed_commit(self):
+
+        if REALITIO_CONTRACT != 'RealitioERC20_v2_1':
+            print("Skipping test_arbitrator_answering_assigning_answerer_unrevealed_commit, not a feature of this contract")
+            return
+
+        k2 = self.web3.eth.accounts[2]
+        k3 = self.web3.eth.accounts[3]
+        k4 = self.web3.eth.accounts[4]
+
+        self._issueTokens(k2, 1000000, 1000000)
+        self._issueTokens(k3, 1000000, 1000000)
+        self._issueTokens(k4, 1000000, 1000000)
+
+        st = None
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k4)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 4, 8, k3)
+
+        last_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 0, 8, 16, k4, True)
+
+        fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
+        self.assertTrue(self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee)), "Requested arbitration")
+
+        arb_answer = to_answer_for_contract(0)
+        arb_payer = keys.privtoaddr(t.k2)
+
+        ##self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+        self.assertEqual(st['answer'][-1], to_answer_for_contract(1001))
+        hist_hash = self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH]
+
+        # Arbitration fails if the reveal timeout has not come yet
+        with self.assertRaises(TransactionFailed):
+            self.arb0.functions.assignWinnerAndSubmitAnswerByArbitrator(self.question_id, arb_answer, arb_payer, st['hash'][0], st['answer'][0], st['addr'][0] ).transact()
+
+        self._advance_clock(10)
+        self.arb0.functions.assignWinnerAndSubmitAnswerByArbitrator(self.question_id, arb_answer, arb_payer, st['hash'][0], st['answer'][0], st['addr'][0] ).transact()
+
+        st['hash'].insert(0, hist_hash)
+        st['bond'].insert(0, 0)
+        st['answer'].insert(0, arb_answer)
+        st['addr'].insert(0, arb_payer)
+
+        self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
+        self.assertEqual(self.rc0.functions.balanceOf(arb_payer).call(), 2+subfee(4)+subfee(8)+subfee(16)+1000, "The arb payer gets it all for a wrong answer")
+
+        return
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_arbitrator_cancel(self):
+
+        if REALITIO_CONTRACT != 'RealitioERC20_v2_1':
+            print("Skipping test_arbitrator_cancel, not a feature of this contract")
+            return
+
+        self.rc0.functions.submitAnswerERC20(self.question_id, to_answer_for_contract(12345), 0, 1).transact(self._txargs())
+
+        # The arbitrator cannot submit an answer that has not been requested. 
+        # (If they really want to do this, they can always pay themselves for arbitration.)
+        with self.assertRaises(TransactionFailed):
+            self.arb0.functions.submitAnswerByArbitrator(self.question_id, to_answer_for_contract(123456), keys.privtoaddr(t.k0)).transact()
+
+        # The arbitrator cannot cancel arbitration that has not been requested
+        with self.assertRaises(TransactionFailed):
+            self.arb0.functions.cancelArbitration(self.question_id).transact()
+
+        self.assertFalse(self.rc0.functions.isFinalized(self.question_id).call())
+
+        fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
+        self.assertTrue(self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee)), "Requested arbitration")
+        question = self.rc0.functions.questions(self.question_id).call()
+        #self.assertEqual(question[QINDEX_FINALIZATION_TS], 1, "When arbitration is pending for an answered question, we set the finalization_ts to 1")
+        self.assertTrue(question[QINDEX_IS_PENDING_ARBITRATION], "When arbitration is pending for an answered question, we set the is_pending_arbitration flag to True")
+
+        # Only the arbitrator can cancel arbitration
+        with self.assertRaises(TransactionFailed):
+            self.rc0.functions.cancelArbitration(self.question_id).transact()
+
+        cancelled_ts = self._block_timestamp()
+        self.arb0.functions.cancelArbitration(self.question_id).transact();
+        question = self.rc0.functions.questions(self.question_id).call()
+
+        self.assertFalse(self.rc0.functions.isFinalized(self.question_id).call())
+
+        # The arbitrator cannot cancel arbitration again as it is no longer pending arbitratin
+        with self.assertRaises(TransactionFailed):
+            self.arb0.functions.cancelArbitration(self.question_id).transact()
+
+        self.assertFalse(question[QINDEX_IS_PENDING_ARBITRATION], "When arbitration has been cancelled, is_pending_arbitration flag is set back to False")
+        self.assertEqual(question[QINDEX_FINALIZATION_TS], cancelled_ts + 30, "Cancelling arbitration extends the timeout")
+
+        # You can submit answers again
+        self.rc0.functions.submitAnswerERC20(self.question_id, to_answer_for_contract(54321), 0, 2).transact(self._txargs())
+
+        # You can request arbitration again
+        self.assertTrue(self.arb0.functions.requestArbitration(self.question_id, 0).transact(self._txargs(val=fee)), "Requested arbitration again")
 
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
@@ -1268,6 +1504,41 @@ class TestRealitio(TestCase):
 
         return
 
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_submit_answer_for_withdrawal(self):
+
+        if REALITIO_CONTRACT != 'RealitioERC20_v2_1':
+            print("Skipping test_submit_answer_for_withdrawal, submitAnswerFor is not a feature of this contract")
+            return
+
+        k4 = self.web3.eth.accounts[4]
+        k5 = self.web3.eth.accounts[5]
+        self._issueTokens(k5, 1000000, 1000000)
+        self._issueTokens(k4, 1000000, 1000000)
+
+        with self.assertRaises(TransactionFailed):
+            txid = self.rc0.functions.submitAnswerForERC20(self.question_id, to_answer_for_contract(12345), 0, "0x0000000000000000000000000000000000000000", 100).transact(self._txargs(sender=k4))
+            self.raiseOnZeroStatus(txid)
+
+        self.rc0.functions.submitAnswerForERC20(self.question_id, to_answer_for_contract(12345), 0, k5, 100).transact(self._txargs(sender=k4))
+        self._advance_clock(33)
+        self.rc0.functions.claimWinnings(self.question_id, [decode_hex("0x00")], [k5], [100], [to_answer_for_contract(12345)]).transact(self._txargs(sender=k5))
+
+        starting_deposited = self.rc0.functions.balanceOf(k5).call()
+        self.assertEqual(starting_deposited, 1100)
+
+        gas_used = 0
+        starting_bal = self.token0.functions.balanceOf(k5).call()
+
+        txid = self.rc0.functions.withdraw().transact(self._txargs(sender=k5))
+        rcpt = self.web3.eth.getTransactionReceipt(txid)
+        gas_used = rcpt['cumulativeGasUsed']
+        ending_bal = self.token0.functions.balanceOf(k5).call()
+
+        self.assertEqual(self.rc0.functions.balanceOf(k5).call(), 0)
+        self.assertEqual(ending_bal, starting_bal + starting_deposited)
+
+        return
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_arbitrator_fee_received(self):
