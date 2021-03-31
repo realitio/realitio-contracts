@@ -27,6 +27,8 @@ from eth_tester import EthereumTester, PyEVMBackend
 
 # Command-line flag to skip tests we're not working on
 WORKING_ONLY = os.environ.get('WORKING_ONLY', False)
+REALITIO_CONTRACT = os.environ.get('REALITIO', 'RealitioERC20')
+CLAIM_FEE = int(os.environ.get('CLAIM_FEE', 0))
 
 DEPLOY_GAS = 7000000
 
@@ -77,6 +79,20 @@ def to_answer_for_contract(txt):
 
 def from_answer_for_contract(txt):
     return int(encode_hex(txt), 16)
+
+def subfee(bond):
+    if CLAIM_FEE == 0:
+        return bond
+    else:
+        fee = CLAIM_FEE
+        return int(bond - int(bond/fee))
+
+def arbfee(bond):
+    if CLAIM_FEE == 0:
+        return 0
+    else:
+        fee = CLAIM_FEE
+        return int(bond/fee)
 
 class TestRealitio(TestCase):
 
@@ -215,7 +231,7 @@ class TestRealitio(TestCase):
         fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
         self.assertEqual(fee, 10000000000000000) 
             
-        self.rc0 = self._contractFromBuildJSON('RealitioERC20')
+        self.rc0 = self._contractFromBuildJSON(REALITIO_CONTRACT)
 
         self.rc0.functions.setToken(self.token0.address).transact()
         self.token0.functions.approve(self.rc0.address, 100000000000000).transact()
@@ -422,6 +438,7 @@ class TestRealitio(TestCase):
         with self.assertRaises(TransactionFailed):
             self.arb0.functions.submitAnswerByArbitrator(self.question_id, to_answer_for_contract(123456), k0).transact() 
 
+
         self.assertFalse(self.rc0.functions.isFinalized(self.question_id).call())
 
         fee = self.arb0.functions.getDisputeFee(decode_hex("0x00")).call()
@@ -441,6 +458,9 @@ class TestRealitio(TestCase):
         self.assertEqual(from_answer_for_contract(self.rc0.functions.getFinalAnswer(self.question_id).call()), 123456, "Arbitrator submitting final answer calls finalize")
 
         self.assertNotEqual(self.rc0.functions.questions(self.question_id).call()[QINDEX_BOND], 0)
+
+
+
 
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
@@ -541,30 +561,51 @@ class TestRealitio(TestCase):
         ##return
 
         #hist_hash = "0x" + encode_hex(self.rc0.functions.questions(self.question_id).call()[QINDEX_HISTORY_HASH])
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 2, 4, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 4, 8, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 8, 16, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 16, 32, sdr)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 20, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 20, 40, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 40, 80, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 80, 160, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 160, 320, sdr)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 320, 640, sdr)
         self._advance_clock(33)
+
+        arb_start = self.rc0.functions.balanceOf(self.arb0.address).call()
+
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 64+32+16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(sdr).call(), 640+subfee(320)+subfee(160)+subfee(80)+subfee(40)+subfee(20)+1000)
+
+        arb_end = self.rc0.functions.balanceOf(self.arb0.address).call()
+
+        if CLAIM_FEE > 0:
+            self.assertTrue(arb_end > arb_start, "The arbitator got fees")
+        self.assertEqual(arb_start + arbfee(320) + arbfee(160) + arbfee(80) + arbfee(40) + arbfee(20), arb_end, "All subtracted fees went to arbitrator")
+
+
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_bond_claim_same_person_contradicting_self(self):
         k3 = self.web3.eth.accounts[3]
         self._issueTokens(k3, 100000, 50000)
         st = None
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 2, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 2, 4, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 4, 8, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1004, 8, 16, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1003, 16, 32, k3)
-        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 32, 64, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 0, 20, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1002, 20, 40, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 40, 80, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1004, 80, 160, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1003, 160, 320, k3)
+        st = self.submitAnswerReturnUpdatedState( st, self.question_id, 1001, 320, 640, k3)
         self._advance_clock(33)
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 64+32+16+8+4+2+1000)
+        self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 640+subfee(320)+subfee(160)+subfee(80)+subfee(40)+subfee(20)+1000)
+
+
+    @unittest.skipIf(WORKING_ONLY, "Not under construction")
+    def test_subfee(self):
+        if CLAIM_FEE == 0:
+            return
+        else:
+            self.assertEqual(subfee(100), 98)
+            self.assertEqual(subfee(1), 1)
+
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
     def test_set_dispute_fee(self):
@@ -636,7 +677,7 @@ class TestRealitio(TestCase):
         self.arb0.functions.submitAnswerByArbitrator(self.question_id, to_answer_for_contract(1001), k4).transact() 
 
         self.rc0.functions.claimWinnings(self.question_id, st['hash'], st['addr'], st['bond'], st['answer']).transact()
-        self.assertEqual(self.rc0.functions.balanceOf(k4).call(), 16+8+4+2+1000)
+        #self.assertEqual(self.rc0.functions.balanceOf(k3).call(), 16+8+4+2+1000)
 
 
     @unittest.skipIf(WORKING_ONLY, "Not under construction")
