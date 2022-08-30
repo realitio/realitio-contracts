@@ -18,7 +18,7 @@ distlib==0.3.0
 distro==1.4.0
 eth==0.0.1
 eth-abi==2.1.1
-eth-account==0.5.3
+eth-account==0.5.9
 eth-bloom==1.0.3
 eth-hash==0.2.0
 eth-keyfile==0.5.1
